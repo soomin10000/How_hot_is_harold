@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Hot is Harold?</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    h1 { font-size: 2.5rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #888; margin-bottom: 2rem; font-size: 0.9rem; }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      min-width: 340px;
+      text-align: center;
+    }
+    .power-badge {
+      display: inline-block;
+      padding: 0.25rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+    }
+    .power-on  { background: #1a3a1a; color: #4ade80; border: 1px solid #2a5a2a; }
+    .power-off { background: #3a1a1a; color: #f87171; border: 1px solid #5a2a2a; }
+    .temps {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      align-items: flex-end;
+      margin-bottom: 1.75rem;
+    }
+    .temp-block { text-align: center; }
+    .temp-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    .temp-value { font-size: 3.5rem; font-weight: 700; line-height: 1; }
+    .temp-value.current { color: #ff6b35; }
+    .temp-unit { font-size: 1.4rem; color: #888; vertical-align: super; }
+    .dps {
+      text-align: left;
+      font-size: 0.82rem;
+      border-top: 1px solid #2a2a2a;
+      padding-top: 1rem;
+    }
+    .dps table { width: 100%; border-collapse: collapse; }
+    .dps td { padding: 0.2rem 0.4rem; }
+    .dps td:first-child { color: #555; width: 35%; }
+    .dps td:nth-child(2) { color: #ccc; font-family: monospace; }
+    .dps td.age { color: #444; font-size: 0.72rem; text-align: right; padding-left: 1rem; }
+    .error { color: #ff4444; font-size: 0.9rem; margin-top: 1rem; }
+    .ts { margin-top: 1.25rem; font-size: 0.72rem; color: #444; }
+  </style>
+</head>
+<body>
+  <h1>Harold</h1>
+  <p class="subtitle">Intelligent Heater &mdash; 192.168.1.237</p>
+
+  <div class="card" id="card"><div class="ts">Loading…</div></div>
+
+  <p style="margin-top:1.5rem;color:#444;font-size:0.78rem">
+    Updates every 5s &bull; <a href="/api/status" style="color:#444">JSON</a>
+  </p>
+
+  <script>
+    const LABELS = {'1':'Power','2':'Set temp','3':'Temperature','4':'Mode','12':'Timer'};
+    const MODE_LABELS = {'low':'Low','high':'High','af':'Anti-frost'};
+    const DP_SHADOW = {'1':'Power','2':'TempSet','3':'TempCurrent','4':'Mode','12':'Fault'};
+
+    function fmtValue(k, v) {
+      if (k === '4') return MODE_LABELS[v] || v;
+      return String(v);
+    }
+
+    function fmtAge(ms) {
+      const s = Math.round((Date.now() - ms) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return Math.floor(s / 60) + 'm ago';
+      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+      return Math.floor(s / 86400) + 'd ago';
+    }
+
+    function el(tag, cls, text) {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    }
+
+    function render(state) {
+      const card = document.getElementById('card');
+      card.innerHTML = '';
+
+      const dps = state.dps || {};
+      const error = state.Error;
+      const hasDps = Object.keys(dps).length > 0;
+
+      if (error && !hasDps) {
+        card.appendChild(el('div', 'error', error));
+      } else {
+        const power = dps['1'];
+
+        const badge = el('div', 'power-badge ' + (power ? 'power-on' : 'power-off'),
+          power ? '• On' : 'Off');
+        card.appendChild(badge);
+
+        const temps = el('div', 'temps');
+        const block = el('div', 'temp-block');
+        block.appendChild(el('div', 'temp-label', 'Temperature'));
+        const valDiv = el('div', 'temp-value current');
+        const ct = dps['3'];
+        if (ct != null) {
+          valDiv.textContent = ct;
+          valDiv.appendChild(el('span', 'temp-unit', '°C'));
+        } else {
+          valDiv.textContent = '—';
+        }
+        block.appendChild(valDiv);
+        temps.appendChild(block);
+        card.appendChild(temps);
+
+        if (hasDps) {
+          const shadow = state.shadow || {};
+          const wrap = el('div', 'dps');
+          const table = el('table');
+          Object.keys(dps).sort((a, b) => +a - +b).forEach(k => {
+            const tr = el('tr');
+            tr.appendChild(el('td', null, LABELS[k] || 'dp ' + k));
+            tr.appendChild(el('td', null, fmtValue(k, dps[k])));
+            const shadowMs = shadow[DP_SHADOW[k]];
+            tr.appendChild(el('td', 'age', shadowMs ? fmtAge(shadowMs) : ''));
+            table.appendChild(tr);
+          });
+          wrap.appendChild(table);
+          card.appendChild(wrap);
+        }
+
+        if (error) {
+          card.appendChild(el('div', 'error', error));
+        }
+      }
+
+      const ts = state.ts;
+      const tsDiv = el('div', 'ts');
+      if (ts) {
+        const s = Math.round(Date.now() / 1000 - ts);
+        tsDiv.textContent = 'Last updated: ' + (s < 5 ? 'just now' : s + 's ago');
+      }
+      card.appendChild(tsDiv);
+    }
+
+    async function poll() {
+      try {
+        const r = await fetch('/api/status');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        render(await r.json());
+      } catch (_) {
+        const card = document.getElementById('card');
+        card.innerHTML = '';
+        card.appendChild(el('div', 'error', 'Could not reach server'));
+      }
+    }
+
+    poll();
+    setInterval(poll, 5000);
+  </script>
+</body>
+</html>
