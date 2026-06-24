@@ -69,14 +69,20 @@ def poll_harold():
             d = make_device()
             raw = d.status()
             with _lock:
+                shadow = _state.get("shadow")
                 _state.clear()
                 _state.update(raw)
                 _state["ts"] = time.time()
+                if shadow:
+                    _state["shadow"] = shadow
         except Exception as exc:
             with _lock:
+                shadow = _state.get("shadow")
                 _state.clear()
                 _state["Error"] = str(exc)
                 _state["ts"] = time.time()
+                if shadow:
+                    _state["shadow"] = shadow
         time.sleep(POLL_INTERVAL)
 
 
