@@ -47,8 +47,8 @@ def poll_shadow():
                 shadow = {p["code"]: p["time"] for p in r["result"]["properties"]}
                 with _lock:
                     _state["shadow"] = shadow
-        except Exception:
-            pass
+        except Exception as e:
+            print(f'poll_shadow error: {e}', flush=True)
         time.sleep(SHADOW_INTERVAL)
 
 
