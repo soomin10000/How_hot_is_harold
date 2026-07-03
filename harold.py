@@ -110,4 +110,4 @@ if __name__ == "__main__":
     t.start()
     if TUYA_API_KEY and TUYA_API_SECRET:
         threading.Thread(target=poll_shadow, daemon=True).start()
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
